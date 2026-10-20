@@ -60,6 +60,13 @@ main{padding:16px;max-width:1400px;margin:0 auto}
 .choice.correct .lt{background:var(--ok)}
 .choice.correct .barbg{background:rgba(46,158,106,.28)}
 .choice.dim{opacity:.55}
+.imgchoices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.imgc{position:relative;border:4px solid var(--line);border-radius:12px;overflow:hidden;background:#000}
+.imgc img{display:block;width:100%;height:min(30vh,300px);object-fit:cover}
+.imgc .lt{position:absolute;left:8px;top:8px;width:48px;height:48px;border-radius:10px;background:var(--navy);color:#fff;font-weight:800;font-size:28px;display:flex;align-items:center;justify-content:center}
+.imgc .ct{position:absolute;right:8px;bottom:8px;background:rgba(255,255,255,.92);color:var(--navy);font-weight:800;font-size:24px;border-radius:8px;padding:2px 10px}
+.imgc.correct{border-color:var(--ok)} .imgc.correct .lt{background:var(--ok)}
+.imgc.dim{opacity:.45}
 .status{display:flex;gap:20px;align-items:center;margin-top:18px;flex-wrap:wrap}
 .big{font-size:clamp(28px,3.5vw,54px);font-weight:800;color:var(--navy)}
 .timer{width:clamp(80px,9vw,130px);height:clamp(80px,9vw,130px);border-radius:50%;background:conic-gradient(var(--blue) var(--p,100%),#cfe6f3 0);display:flex;align-items:center;justify-content:center}
@@ -110,6 +117,11 @@ tr.top1 td{background:#FFF7DA}
 .p-choice.sel{border-color:var(--blue);background:#EEF8FE}
 .p-choice:disabled{cursor:default}
 .p-choice.dim{opacity:.45}
+.p-imgchoices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.p-imgc{position:relative;padding:0;border:3px solid var(--line);border-radius:12px;overflow:hidden;background:#000;width:100%}
+.p-imgc img{display:block;width:100%;height:120px;object-fit:cover}
+.p-imgc .lt{position:absolute;left:6px;top:6px;width:38px;height:38px;border-radius:8px;background:var(--navy);color:#fff;font-weight:800;font-size:22px;display:flex;align-items:center;justify-content:center}
+.p-imgc.sel{border-color:var(--blue)} .p-imgc.dim{opacity:.4}
 .p-meta{display:flex;justify-content:space-between;align-items:center;font-weight:700;color:var(--navy);margin-bottom:4px}
 .p-pill{background:var(--blue);color:#fff;border-radius:999px;padding:2px 12px;font-size:14px}
 .verdict{border-radius:16px;padding:22px;text-align:center;color:#fff;font-weight:800}
@@ -130,7 +142,7 @@ tr.top1 td{background:#FFF7DA}
 /* ===================== 問題データ（ここだけ編集すれば問題を差し替えられます） ===================== */
 const QUESTIONS = [
   { q:"全職員が仕事でChatGPTを使えるようにした、全国で最初の自治体は？",
-    c:["渋谷区","つくば市","横須賀市","松戸市"], a:"C",
+    c:["渋谷区","つくば市","横須賀市","流山市"], a:"C",
     note:"2023年4月に全庁で使い始めました。" },
   { q:"2025年、AIを「大臣」に任命した国は？",
     c:["エストニア","アルバニア","シンガポール","アラブ首長国連邦"], a:"B",
@@ -144,9 +156,10 @@ const QUESTIONS = [
   { q:"無料のAIチャットに入れてもよいのはどれ？",
     c:["後援会の名簿","陳情に来た方の住所と電話番号","ホームページで公開済みの国政報告","事務所のパスワード"], a:"C",
     note:"入れてよいのは公開済みの情報だけです。" },
-  { q:"AIで作ったポスター画像で、いちばん崩れやすいのは？",
-    c:["空の色","人の表情","日本語の文字","背景の建物"], a:"C",
-    note:"文字は後からCanvaやPowerPointで入れるのが早道です。", bonus:true },
+  { q:"国会議事堂の写真のうち、本物はどれ？（残りの3枚はAIが作った画像）",
+    c:["写真A","写真B","写真C","写真D"], a:"C",
+    img:["img/kokkai-a.jpg","img/kokkai-b.jpg","img/kokkai-c.jpg","img/kokkai-d.jpg"],
+    note:"本物は見慣れた建物でも、AIの画像は細部（柱の本数、塔の形、窓の並び）が少しずつ違います。", bonus:true },
 ];
 const DURATION = 20;            // 1問の制限時間（秒）
 const LETTERS = ["A","B","C","D"];
@@ -305,6 +318,10 @@ function startHost(){
     const Q = QUESTIONS[q]; const ans = S.answers[q] || {};
     const counts = [0,0,0,0]; Object.values(ans).forEach(c => counts[LETTERS.indexOf(c)]++);
     const max = Math.max(1, ...counts);
+    if (Q.img) return `<div class="imgchoices">` + Q.img.map((src,i) => {
+      const L = LETTERS[i]; const cls = reveal ? (L === Q.a ? "correct" : "dim") : "";
+      return `<div class="imgc ${cls}"><img src="${esc(src)}" alt="${L}"><span class="lt">${L}</span>${reveal ? `<span class="ct">${counts[i]}人</span>` : ""}</div>`;
+    }).join("") + `</div>`;
     return `<div class="choices">` + Q.c.map((t,i) => {
       const L = LETTERS[i]; const cls = reveal ? (L === Q.a ? "correct" : "dim") : "";
       const bar = reveal ? `<div class="barbg" data-w="${Math.round(counts[i]/max*100)}"></div>` : "";
@@ -485,8 +502,10 @@ function startPlayer(){
       const Q = QUESTIONS[st.q]; const mine = P.answers[st.q];
       body = `<div class="card"><div class="p-meta"><span class="p-pill">${qLabel(st.q)}</span><span>残り <span id="ptl">--</span> 秒</span></div>
         <div class="p-q">${esc(Q.q)}</div>
-        <div class="p-choices">${Q.c.map((t,i) => { const L = LETTERS[i];
-          return `<button class="p-choice ${mine ? (mine===L ? "sel" : "dim") : ""}" data-c="${L}" ${mine ? "disabled" : ""}><span class="lt">${L}</span><span class="tx">${esc(t)}</span></button>`; }).join("")}</div>
+        ${Q.img ? `<div class="p-imgchoices">${Q.img.map((src,i) => { const L = LETTERS[i];
+          return `<button class="p-imgc p-choice-btn ${mine ? (mine===L ? "sel" : "dim") : ""}" data-c="${L}" ${mine ? "disabled" : ""}><img src="${esc(src)}" alt="${L}"><span class="lt">${L}</span></button>`; }).join("")}</div>` :
+        `<div class="p-choices">${Q.c.map((t,i) => { const L = LETTERS[i];
+          return `<button class="p-choice ${mine ? (mine===L ? "sel" : "dim") : ""}" data-c="${L}" ${mine ? "disabled" : ""}><span class="lt">${L}</span><span class="tx">${esc(t)}</span></button>`; }).join("")}</div>`}
         ${mine ? `<div class="p-center" style="padding:14px 0 0"><h2>回答しました（${mine}）</h2><p class="muted" style="margin:0">正解発表をお待ちください</p></div>` : ""}
         ${errBox()}</div>`;
     } else if (st.ph === "rev"){
@@ -509,7 +528,7 @@ function startPlayer(){
     setConn("pc", connected);
     const jf = document.getElementById("jf");
     if (jf) jf.onsubmit = e => { e.preventDefault(); const v = document.getElementById("nm").value.trim(); if (v) join(v.slice(0,20)); else document.getElementById("nm").focus(); };
-    document.querySelectorAll(".p-choice[data-c]").forEach(b => b.onclick = () => answer(st.q, b.dataset.c));
+    document.querySelectorAll("button[data-c]").forEach(b => b.onclick = () => answer(st.q, b.dataset.c));
     const rb = document.getElementById("resendBtn"); if (rb) rb.onclick = resend;
     if (st && st.ph === "q"){
       const update = () => {
